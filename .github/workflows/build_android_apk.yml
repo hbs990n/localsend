@@ -4,28 +4,17 @@ on:
   workflow_dispatch:
   workflow_call:
 
+permissions:
+  contents: read
+
 env:
   FLUTTER_VERSION: "3.41.9"
   APK_BUILD_DIR: "/tmp/build"
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Get version from pubspec.yaml
-        id: get_version
-        run: |
-          VERSION=$(sed -n 's/^version: \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' app/pubspec.yaml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
   build_apk:
-    needs: build
     runs-on: ubuntu-22.04
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -36,20 +25,8 @@ jobs:
 
       - name: Copy files to env.APK_BUILD_DIR
         run: |
-          mkdir -p $APK_BUILD_DIR
-          cp -r . $APK_BUILD_DIR
-
-      - name: Decode key.properties file
-        working-directory: ${{ env.APK_BUILD_DIR }}
-        env:
-          ENCODED_STRING: ${{ secrets.ANDROID_KEY_PROPERTIES }}
-        run: echo $ENCODED_STRING | base64 -di > app/android/key.properties
-
-      - name: Decode android-keystore.jks file
-        working-directory: ${{ env.APK_BUILD_DIR }}
-        env:
-          ENCODED_STRING: ${{ secrets.ANDROID_KEY_STORE }}
-        run: mkdir secrets && echo $ENCODED_STRING | base64 -di > secrets/android-keystore.jks
+          mkdir -p "$APK_BUILD_DIR"
+          cp -a . "$APK_BUILD_DIR"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -61,11 +38,64 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          pub-cache: true
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+
+      - name: Cache Gradle and Flutter build outputs
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ${{ env.APK_BUILD_DIR }}/app/android/.gradle
+            ${{ env.APK_BUILD_DIR }}/app/.dart_tool
+            ${{ env.APK_BUILD_DIR }}/app/build
+          key: ${{ runner.os }}-gradle-${{ hashFiles('pubspec.lock', 'pubspec.yaml', 'app/pubspec.yaml', 'app/android/**/*.gradle', 'app/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Rust
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.APK_BUILD_DIR }}/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache CI signing key
+        id: signing-key-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{ env.APK_BUILD_DIR }}/secrets/ci-keystore.jks
+            ${{ env.APK_BUILD_DIR }}/app/android/key.properties
+          key: ${{ runner.os }}-localsend-ci-signing-key-v1
+
+      - name: Generate temporary signing key
+        if: steps.signing-key-cache.outputs.cache-hit != 'true'
+        working-directory: ${{ env.APK_BUILD_DIR }}
+        run: |
+          mkdir -p secrets
+          keytool -genkeypair -v \
+            -keystore "$PWD/secrets/ci-keystore.jks" \
+            -alias localsend-ci \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass localsend -keypass localsend \
+            -dname "CN=LocalSend CI, OU=CI, O=LocalSend, L=Unknown, ST=Unknown, C=US" > /dev/null
+          printf '%s\n' \
+            "storeFile=$PWD/secrets/ci-keystore.jks" \
+            "storePassword=localsend" \
+            "keyAlias=localsend-ci" \
+            "keyPassword=localsend" \
+            > app/android/key.properties
 
       - name: Check rust-toolchain.toml
         working-directory: ${{ env.APK_BUILD_DIR }}/packages/localsend_isolates
@@ -77,7 +107,7 @@ jobs:
 
       - name: Build APK
         working-directory: ${{ env.APK_BUILD_DIR }}/app
-        run: flutter build apk --split-per-abi
+        run: flutter build apk --release --split-per-abi
 
       - name: Upload APK
         uses: actions/upload-artifact@v6
@@ -87,3 +117,4 @@ jobs:
             ${{ env.APK_BUILD_DIR }}/app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
             ${{ env.APK_BUILD_DIR }}/app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
             ${{ env.APK_BUILD_DIR }}/app/build/app/outputs/flutter-apk/app-x86_64-release.apk
+          if-no-files-found: error
