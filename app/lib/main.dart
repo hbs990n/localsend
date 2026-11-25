@@ -17,6 +17,7 @@ import 'package:localsend_app/widget/watcher/tray_watcher.dart';
 import 'package:localsend_app/widget/watcher/window_brightness_watcher.dart';
 import 'package:localsend_app/widget/watcher/window_watcher.dart';
 import 'package:localsend_isolates/isolate.dart';
+import 'package:localsend_isolates/util/diagnostic_log.dart';
 import 'package:refena_flutter/addons.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 import 'package:routerino/routerino.dart';
@@ -60,6 +61,7 @@ class LocalSendApp extends StatelessWidget {
       child: WindowWatcher(
         child: LifeCycleWatcher(
           onChangedState: (AppLifecycleState state) {
+            writeDiagnosticLog('LIFECYCLE $state');
             switch (state) {
               case AppLifecycleState.resumed:
                 ref.redux(localIpProvider).dispatch(InitLocalIpAction());
