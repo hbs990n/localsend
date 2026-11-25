@@ -91,13 +91,28 @@
             </intent-filter>
         </service>
 
-        <!-- Foreground service showing the receive progress.
-             Warning: the name is defined by flutter_foreground_task and must not be changed. -->
+        <!-- Foreground service showing the transfer progress.
+             Warning: the name is defined by flutter_foreground_task and must not be changed.
+             android:stopWithTask="true" lets Android stop the service when the task is
+             swiped away. The service otherwise lives exactly as long as a transfer task:
+             foreground_service.dart leaves options.stopWithTask unset, so the plugin's
+             "Activity paused" watchdog (which killed background transfers) is not installed
+             and the manifest value below takes effect for restart behaviour. -->
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="true"
             android:exported="false" />
+
+        <!-- No automatic revival. The service is started/stopped only by the transfer task;
+             removing the plugin's receivers prevents the 1s/5s restart alarms and the
+             boot/package-replace restart from bringing it back with no task running. -->
+        <receiver
+            android:name="com.pravera.flutter_foreground_task.service.RestartReceiver"
+            tools:node="remove" />
+        <receiver
+            android:name="com.pravera.flutter_foreground_task.service.RebootReceiver"
+            tools:node="remove" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
