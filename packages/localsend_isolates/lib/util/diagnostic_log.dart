@@ -31,8 +31,11 @@ class DiagnosticLog {
         dir.createSync(recursive: true);
       }
       _directory = _androidDir;
-    } catch (_) {
-      // Ignore: diagnostics are optional.
+    } catch (e) {
+      // Never fail the app because of diagnostics, but make the reason visible in logcat
+      // instead of silently disabling the whole log (which previously hid this failure).
+      // ignore: avoid_print
+      print('[DIAG] init FAILED for $_androidDir: $e');
       _directory = null;
     }
   }
@@ -57,4 +60,11 @@ class DiagnosticLog {
 }
 
 /// Convenience top-level function for callers that only need to append a line.
-void writeDiagnosticLog(String line) => DiagnosticLog.write(line);
+///
+/// Also prints to logcat so diagnostics survive even when the external storage file
+/// cannot be written (which happened silently before).
+void writeDiagnosticLog(String line) {
+  // ignore: avoid_print
+  print('[DIAG] $line');
+  DiagnosticLog.write(line);
+}
