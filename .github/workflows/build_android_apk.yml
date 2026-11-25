@@ -48,7 +48,7 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Cache Gradle and Flutter build outputs
+      - name: Cache Gradle dependencies
         uses: actions/cache@v5
         with:
           path: |
@@ -56,7 +56,6 @@ jobs:
             ~/.gradle/wrapper
             ${{ env.APK_BUILD_DIR }}/app/android/.gradle
             ${{ env.APK_BUILD_DIR }}/app/.dart_tool
-            ${{ env.APK_BUILD_DIR }}/app/build
           key: ${{ runner.os }}-gradle-${{ hashFiles('pubspec.lock', 'pubspec.yaml', 'app/pubspec.yaml', 'app/android/**/*.gradle', 'app/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
