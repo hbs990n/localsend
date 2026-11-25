@@ -110,6 +110,35 @@ jobs:
         working-directory: ${{ env.APK_BUILD_DIR }}/app
         run: flutter build apk --release --target-platform android-arm64
 
+      - name: Strip non-arm64 native libraries
+        working-directory: ${{ env.APK_BUILD_DIR }}/app
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          python3 - <<'PY'
+          import shutil
+          import zipfile
+
+          apk = 'build/app/outputs/flutter-apk/app-release.apk'
+          tmp = apk + '.stripped'
+          with zipfile.ZipFile(apk) as zin, zipfile.ZipFile(tmp, 'w') as zout:
+              for info in zin.infolist():
+                  if info.filename.startswith('lib/') and not info.filename.startswith('lib/arm64-v8a/'):
+                      continue
+                  zout.writestr(info, zin.read(info.filename))
+          shutil.move(tmp, apk)
+          PY
+          SDK_DIR="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BUILD_TOOLS=$(find "$SDK_DIR/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$BUILD_TOOLS/zipalign" -f 4 "$APK" "$APK.aligned"
+          mv "$APK.aligned" "$APK"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$APK_BUILD_DIR/secrets/ci-keystore.jks" \
+            --ks-key-alias localsend-ci \
+            --ks-pass pass:localsend \
+            --key-pass pass:localsend \
+            "$APK"
+          "$BUILD_TOOLS/apksigner" verify "$APK"
+
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
