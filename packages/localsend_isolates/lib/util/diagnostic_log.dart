@@ -37,9 +37,6 @@ class DiagnosticLog {
     }
   }
 
-/// Convenience top-level function for callers that only need to append a line.
-void writeDiagnosticLog(String line) => DiagnosticLog.write(line);
-
   /// Append a single line with a timestamp. Never throws.
   static void write(String line) {
     final directory = _directory;
@@ -58,3 +55,6 @@ void writeDiagnosticLog(String line) => DiagnosticLog.write(line);
     }
   }
 }
+
+/// Convenience top-level function for callers that only need to append a line.
+void writeDiagnosticLog(String line) => DiagnosticLog.write(line);
