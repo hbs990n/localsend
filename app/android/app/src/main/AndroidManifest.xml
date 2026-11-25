@@ -2,6 +2,9 @@
 
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Allow the first transfer to request a battery-optimization exemption. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
@@ -93,6 +96,7 @@
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:foregroundServiceType="dataSync"
+            android:stopWithTask="true"
             android:exported="false" />
 
         <!-- Don't delete the meta-data below.
