@@ -26,6 +26,7 @@ class ForegroundService {
   static DateTime? _lastUpdate;
   static String? _lastTitle;
   static String? _lastText;
+  static bool _batteryOptimizationRequested = false;
 
   /// The service exists on Android only. On iOS the app keeps running in the background anyway,
   /// and on desktop there is nothing to keep alive.
@@ -66,6 +67,7 @@ class ForegroundService {
       }
 
       await _requestNotificationPermission();
+      await _requestIgnoreBatteryOptimizations();
       _init(channelName: channelName);
 
       final result = await FlutterForegroundTask.startService(
@@ -153,8 +155,8 @@ class ForegroundService {
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: _channelId,
         channelName: channelName,
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
+        channelImportance: NotificationChannelImportance.DEFAULT,
+        priority: NotificationPriority.DEFAULT,
         onlyAlertOnce: true,
       ),
       iosNotificationOptions: const IOSNotificationOptions(
@@ -168,8 +170,32 @@ class ForegroundService {
         autoRunOnMyPackageReplaced: false,
         allowWakeLock: true,
         allowWifiLock: true,
+        // A killed transfer must stay killed: no 5-second restart, and removing the task
+        // from Recents stops the service instead of scheduling a restart.
+        allowAutoRestart: false,
+        stopWithTask: true,
       ),
     );
+  }
+
+  /// Ask Android to exclude the app from battery optimizations when the first transfer starts.
+  /// The check happens once per app process: if the user already granted it, nothing is shown;
+  /// if they denied it, we do not ask again during this app session.
+  static Future<void> _requestIgnoreBatteryOptimizations() async {
+    if (_batteryOptimizationRequested) {
+      return;
+    }
+    _batteryOptimizationRequested = true;
+
+    try {
+      if (await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+        return;
+      }
+      final granted = await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+      _logger.info('Ignore battery optimizations: $granted');
+    } catch (e) {
+      _logger.warning('Could not request battery optimization whitelist', e);
+    }
   }
 
   /// Android 13+ needs this permission to show the notification.
