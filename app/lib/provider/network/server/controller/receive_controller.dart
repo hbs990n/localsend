@@ -369,6 +369,7 @@ class ReceiveController {
             ),
           );
     } else {
+      _logger.severe('File upload FAILED: ${receivingFile.desiredName} error=$error');
       server.ref.notifier(fileTransferProvider).setStatus(sessionId: event.sessionId, fileId: fileId, status: FileStatus.failed);
       server.setState(
         (oldState) => oldState?.copyWith(
