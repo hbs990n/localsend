@@ -10,6 +10,8 @@ permissions:
 env:
   FLUTTER_VERSION: "3.41.9"
   APK_BUILD_DIR: "/tmp/build"
+  # Gradle project property read by cargokit: build only the ARM64 native library.
+  ORG_GRADLE_PROJECT_cargokitTargetPlatforms: "android-arm64"
 
 jobs:
   build_apk:
