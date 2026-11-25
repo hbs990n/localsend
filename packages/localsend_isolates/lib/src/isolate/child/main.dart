@@ -38,7 +38,7 @@ Future<void> setupChildIsolateHelper<S, R>({
   Future<void> Function(Ref ref)? init,
   required Future<void> Function(Ref ref, S data) handler,
 }) async {
-  initLogger(initialData.logLevel);
+  initLogger(initialData.logLevel, label: debugLabel);
 
   // Uncaught async errors are fatal to the isolate by default, which would
   // silently kill the server/upload loop; log them instead.
