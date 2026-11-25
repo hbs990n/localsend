@@ -1,3 +1,4 @@
+import 'package:localsend_isolates/util/diagnostic_log.dart';
 import 'package:localsend_isolates/util/file_size_helper.dart';
 import 'package:localsend_isolates/util/file_speed_helper.dart';
 import 'package:localsend_isolates/util/foreground_service.dart';
@@ -14,6 +15,7 @@ class TransferNotification {
 
   static final _transfers = <String, _Transfer>{};
   static NotificationStrings? _strings;
+  static DateTime? _lastProgressLog;
 
   /// Injects the translated strings. Must be called before the first transfer starts.
   /// The locale is pinned on app start, so one call is enough.
@@ -40,6 +42,7 @@ class TransferNotification {
 
     final isFirst = _transfers.isEmpty;
     _transfers[sessionId] = _Transfer(receiving: receiving);
+    writeDiagnosticLog('FG transfer START session=$sessionId receiving=$receiving isFirst=$isFirst');
 
     if (isFirst) {
       ForegroundService.start(
@@ -68,6 +71,15 @@ class TransferNotification {
     transfer.totalBytes = totalBytes;
     transfer.speedInBytes = measureSpeed(startTime: startTime, endTime: endTime, bytes: currentBytes);
 
+    // Throttled by ForegroundService (500ms); log a coarse snapshot at most every 5s so that
+    // a stalled transfer can be told apart from a finished one after the screen locks.
+    final now = DateTime.now();
+    if (_lastProgressLog == null || now.difference(_lastProgressLog!) >= const Duration(seconds: 5)) {
+      _lastProgressLog = now;
+      final percent = totalBytes == 0 ? 0 : (100 * currentBytes / totalBytes).floor();
+      writeDiagnosticLog('FG progress session=$sessionId $percent% ($currentBytes/$totalBytes) fgRunning=${ForegroundService.isRunning}');
+    }
+
     ForegroundService.updateNotification(title: _title(), text: _text());
   }
 
@@ -76,6 +88,7 @@ class TransferNotification {
     if (_transfers.remove(sessionId) == null) {
       return;
     }
+    writeDiagnosticLog('FG transfer STOP session=$sessionId remaining=${_transfers.length}');
 
     if (_transfers.isEmpty) {
       ForegroundService.stop();
