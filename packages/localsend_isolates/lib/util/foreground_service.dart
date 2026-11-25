@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:localsend_isolates/util/diagnostic_log.dart';
 import 'package:localsend_isolates/util/future_queue.dart';
 import 'package:logging/logging.dart';
 
@@ -81,10 +82,12 @@ class ForegroundService {
         // Most likely the app was in the background (Android 12+ forbids starting a foreground
         // service from there). Whatever the service was meant to protect is unaffected.
         _logger.warning('Could not start the foreground service', result.error);
+        writeDiagnosticLog('FG service START FAILED: ${result.error}');
         return;
       }
 
       _running = true;
+      writeDiagnosticLog('FG service STARTED wakelock=true wifilock=true autoRestart=false stopWithTask=true');
     });
   }
 
@@ -138,9 +141,11 @@ class ForegroundService {
       }
 
       _running = false;
+      writeDiagnosticLog('FG service STOP');
       final result = await FlutterForegroundTask.stopService();
       if (result is ServiceRequestFailure) {
         _logger.warning('Could not stop the foreground service', result.error);
+        writeDiagnosticLog('FG service STOP FAILED: ${result.error}');
       }
     });
   }
@@ -189,12 +194,16 @@ class ForegroundService {
 
     try {
       if (await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+        writeDiagnosticLog('BATTERY whitelist already granted');
         return;
       }
+      writeDiagnosticLog('BATTERY whitelist NOT granted, requesting dialog');
       final granted = await FlutterForegroundTask.requestIgnoreBatteryOptimization();
       _logger.info('Ignore battery optimizations: $granted');
+      writeDiagnosticLog('BATTERY whitelist request result: $granted');
     } catch (e) {
       _logger.warning('Could not request battery optimization whitelist', e);
+      writeDiagnosticLog('BATTERY whitelist request ERROR: $e');
     }
   }
 
