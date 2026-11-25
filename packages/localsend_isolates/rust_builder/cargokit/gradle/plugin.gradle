@@ -133,6 +133,11 @@ class CargoKitPlugin implements Plugin<Project> {
             jniLibs.srcDir(new File(cargoOutputDir))
 
             def platforms = com.flutter.gradle.FlutterPluginUtils.getTargetPlatforms(project).collect()
+            // Allow the CI build to restrict cargokit to a single Android ABI.
+            def requestedPlatforms = project.findProperty('cargokitTargetPlatforms')
+            if (requestedPlatforms) {
+                platforms = requestedPlatforms.toString().split(',').collect { it.trim() }.findAll { it }
+            }
 
             // Same thing addFlutterDependencies does in flutter.gradle
             if (buildType == "debug") {
