@@ -180,10 +180,18 @@ class ForegroundService {
         autoRunOnMyPackageReplaced: false,
         allowWakeLock: true,
         allowWifiLock: true,
-        // A killed transfer must stay killed: no 5-second restart, and removing the task
-        // from Recents stops the service instead of scheduling a restart.
+        // The service lifecycle follows the transfer task, not Activity visibility:
+        // start() is called when a transfer begins and stop() when it ends.
+        //
+        // Do NOT set stopWithTask here. The plugin only installs its
+        // ActivityLifecycleCallbacks watchdog (which stops the service the moment every
+        // Activity pauses — background, screen lock, permission dialog — and killed
+        // healthy transfers) when this key is present in prefs with value true. Leaving it
+        // unset avoids the watchdog, and makes the plugin fall back to the manifest's
+        // android:stopWithTask="true", which gives START_NOT_STICKY: no auto-restart after
+        // a system kill, and stopSelf() when the task is swiped away. Setting it to false
+        // would instead yield START_STICKY and survive a system kill.
         allowAutoRestart: false,
-        stopWithTask: true,
       ),
     );
   }
