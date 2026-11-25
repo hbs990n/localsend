@@ -67,8 +67,9 @@ class ForegroundService {
         return;
       }
 
-      await _requestNotificationPermission();
-      await _requestIgnoreBatteryOptimizations();
+      // Start the service FIRST, while the caller is still in the foreground.
+      // Android 12+ refuses to start a foreground service from the background, so any
+      // permission request that shows a dialog must not sit in front of this call.
       _init(channelName: channelName);
 
       final result = await FlutterForegroundTask.startService(
@@ -79,8 +80,6 @@ class ForegroundService {
       );
 
       if (result is ServiceRequestFailure) {
-        // Most likely the app was in the background (Android 12+ forbids starting a foreground
-        // service from there). Whatever the service was meant to protect is unaffected.
         _logger.warning('Could not start the foreground service', result.error);
         writeDiagnosticLog('FG service START FAILED: ${result.error}');
         return;
@@ -88,6 +87,12 @@ class ForegroundService {
 
       _running = true;
       writeDiagnosticLog('FG service STARTED wakelock=true wifilock=true autoRestart=false stopWithTask=true');
+
+      // These can show system dialogs and used to delay startService by several seconds.
+      // Ask only after the service is up; a granted notification permission is not required
+      // for the service itself to run.
+      await _requestNotificationPermission();
+      await _requestIgnoreBatteryOptimizations();
     });
   }
 
